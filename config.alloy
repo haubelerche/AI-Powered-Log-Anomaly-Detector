@@ -1,0 +1,16 @@
+prometheus.scrape "pushgateway" {
+  targets = [
+    {"__address__" = "pushgateway:9091"},
+  ]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GC_RW_URL")
+    basic_auth {
+      username = env("GC_USERNAME")
+      password = env("GC_API_KEY")
+    }
+  }
+}

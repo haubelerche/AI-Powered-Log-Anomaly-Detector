@@ -1,0 +1,13 @@
+metrics:
+  configs:
+    - name: default
+      scrape_configs:
+        - job_name: 'pushgateway'
+          static_configs:
+            - targets: ['pushgateway:9091']
+
+      remote_write:
+        - url: ${GC_RW_URL}
+          basic_auth:
+            username: ${GC_USERNAME}
+            password: ${GC_API_KEY}

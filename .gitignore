@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+.xml
+.idea/
+.vscode/
+.mypy_cache/
+.pytest_cache/
+.csv
+# Data/artifacts - commented out to allow committing
+data/
+features/
+models/
+pgdata/
+models/**/*.npy
+*.parquet
+*.arrow
+
+# Keep pgdata excluded (database files should not be committed)
+
+
+# Local/OS
+.DS_Store
+Thumbs.db
+
+# Notebooks/plots caches
+.ipynb_checkpoints/

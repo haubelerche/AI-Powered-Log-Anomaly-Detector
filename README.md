@@ -72,8 +72,6 @@ python evaluation/evaluate.py         # writes reports/{metrics.json, roc.png, p
 # 5) Ingest session-level scores to PostgreSQL (for Grafana)
 python serving/ingest_postgres.py     # uses reports/ensemble_sessions.csv
 
-# 6) (Optional) Push live scores to Prometheus/Alloy
-python visual/push_scores_live.py
 ```
 
 ---
@@ -88,8 +86,10 @@ python visual/push_scores_live.py
   - Notes: calibrated via isotonic regression.
 
 - **Autoencoder (benign-val)** – see `reports/ae_val.json`  
-  - Threshold (reconstruction error): **p99–p99.5**  
-  - Error distribution & chosen cutoff saved to `reports/`.
+  - ROC-AUC: 0.9412
+  - Average Precision (AP): 0.1373
+  - Threshold (z-score of reconstruction error): 12.516 (~p99–p99.5 of benign)
+  - Extras: SVD_k=256 (EVR≈1.000000), batch=256;
 
 - **Stacked Ensemble (session-level)** – see `reports/metrics.json`  
   - ROC-AUC: **…**  

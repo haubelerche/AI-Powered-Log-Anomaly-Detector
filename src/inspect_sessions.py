@@ -1,10 +1,23 @@
 # src/inspect_sessions.py
-import sys, glob, pandas as pd
-sess_dir = "data/processed/sessions_labeled_csv"
-sid = sys.argv[1]
-dfs = [pd.read_csv(p) for p in glob.glob(f"{sess_dir}/part=*/*.csv")]
-df = pd.concat(dfs, ignore_index=True)
-row = df[df["session_id"] == sid].iloc[0]
-print("session_id:", sid)
-print("len_seq:", row["len_seq"], "label:", row.get("label", "NA"))
-print(row["log_keys_str"])
+from pathlib import Path
+import pandas as pd
+p = Path("data/processed")/ "sessions.csv"
+df = pd.read_csv(p, low_memory=False)
+print(df["label"].value_counts())
+
+# Check session_id uniqueness and provide informative output
+unique_sessions = df["session_id"].nunique()
+total_sessions = len(df)
+print(f"\nSession ID statistics:")
+print(f"Total rows: {total_sessions}")
+print(f"Unique session_ids: {unique_sessions}")
+print(f"Duplicate session_ids: {total_sessions - unique_sessions}")
+
+if not df["session_id"].is_unique:
+    print("\nWARNING: session_id is not unique!")
+    # Show some examples of duplicates
+    duplicates = df[df.duplicated(subset=['session_id'], keep=False)].sort_values('session_id')
+    print(f"Example duplicate session_ids:")
+    print(duplicates[['session_id']].head(10))
+else:
+    print("✓ session_id is unique")

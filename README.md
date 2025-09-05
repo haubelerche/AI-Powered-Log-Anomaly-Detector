@@ -109,13 +109,15 @@ python serving/ingest_postgres.py     # uses reports/ensemble_sessions.csv
   ```
 - **[Grafana dashboards](https://snapshots.raintank.io/dashboard/snapshot/yKxIaKGqJWuP04jIYRu0wJQSBHUI0Vec)**: example JSONs under `provisioning/dashboards/` (import into Grafana).
 
-![img.png](img.png)
+<img width="2511" height="837" alt="img" src="https://github.com/user-attachments/assets/84beee9c-f88a-4016-bba6-7450ca610867" />
 
-![img_1.png](img_1.png)
+<img width="2506" height="523" alt="img_1" src="https://github.com/user-attachments/assets/c7fd445b-1ed8-476d-b999-c47668db3289" />
 
-![img_2.png](img_2.png)
+<img width="1488" height="698" alt="img_2" src="https://github.com/user-attachments/assets/291b194f-41d2-49a1-b563-5006b35a1228" />
 
-![img_3.png](img_3.png)
+<img width="2512" height="678" alt="img_3" src="https://github.com/user-attachments/assets/d8e1ad30-2ba0-4068-99a8-c0ef2d5d72fa" />
+
+
 
 ## Repository Structure
 

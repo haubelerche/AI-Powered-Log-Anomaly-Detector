@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 
-# ---------- Config ----------
 DAYS_BACK            = 365      # Trải đều dữ liệu trong 365 ngày gần nhất
 NUM_HOSTS            = 50       # Số host ảo để phân bổ vòng lặp
 SERVICES             = ["hdfs"]  # có thể rút gọn còn ["hdfs"]
@@ -16,14 +15,13 @@ TIME_JITTER_MIN      = 5        # Jitter +- phút cho mỗi điểm (0 để t�
 RNG_SEED             = 42
 
 script_dir   = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(script_dir)   # assumes this file is in src/tools
+project_root = os.path.dirname(script_dir) 
 models_dir   = os.path.join(project_root, "models")
 data_dir     = os.path.join(project_root, "data")
 os.makedirs(data_dir, exist_ok=True)
 
 def dbg(msg): print(f"[export_csv_uniform] {msg}")
 
-# ---------- Load model outputs ----------
 def load_ensemble_any():
     for name in ["ensemble_all.csv", "ensemble.csv"]:
         p = os.path.join(models_dir, name)
@@ -60,7 +58,6 @@ def normalize_ensemble(df: pd.DataFrame) -> pd.DataFrame:
                     candidates.append(c)
         if not candidates:
             raise ValueError("Không tìm thấy cột điểm để tạo 'anomaly_score'")
-        # chuẩn hóa 0..1 rồi lấy max
         scaled = []
         for c in candidates:
             s = df[c].astype(float)
@@ -93,7 +90,6 @@ def load_iso_forest_fallback():
         "pred": y_pred.astype(int),
     })
 
-# ---------- Uniform generators ----------
 def uniform_timestamps(n: int, days_back=DAYS_BACK, jitter_min=TIME_JITTER_MIN, seed=RNG_SEED):
     """
     Phân bố đều từ now-days_back đến now, thêm jitter nhỏ để tự nhiên.

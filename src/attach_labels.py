@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd
 
 def normalize_id(s: pd.Series) -> pd.Series:
-    # chuẩn hoá ID: strip, lower, bỏ khoảng trắng, để tránh lệch key
     s = s.astype(str).str.strip().str.lower()
     return s
 
@@ -15,7 +14,7 @@ def attach_labels(sessions_csv: str,
     out_csv = Path(out_csv)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
-    # 1) đọc SESSIONS HỢP NHẤT (KHÔNG gom part= nữa để tránh nhân đôi)
+    # đọc SESSIONS HỢP NHẤT (KHÔNG gom part= nữa để tránh nhân đôi)
     if not sessions_csv.exists():
         raise FileNotFoundError(f"Không thấy sessions_csv: {sessions_csv}. Hãy chạy sessionize_hdfs.py trước.")
     sess = pd.read_csv(sessions_csv, parse_dates=["timestamp"], low_memory=False)
@@ -30,34 +29,33 @@ def attach_labels(sessions_csv: str,
     sess["block_id"] = normalize_id(sess["block_id"])
     sess["session_id"] = normalize_id(sess["session_id"])
 
-    # 2) đọc & chuẩn hoá LABELS
+    # c.hoa label
     lab = pd.read_csv(label_path, low_memory=False, header=None, names=['block_id', 'label'])
     lab.columns = [c.strip().lower() for c in lab.columns]
 
     if "block_id" not in lab.columns or "label" not in lab.columns:
         raise ValueError(f"Label file phải có cột block_id & label. Columns hiện có: {list(lab.columns)}")
 
-    # chuẩn hoá ID & nhãn
+    # c.h id
     lab["block_id"] = normalize_id(lab["block_id"])
     # Convert Normal/Anomaly text labels to 0/1
     if lab["label"].dtype == object:
         lab["label"] = lab["label"].str.strip().str.lower().map({"normal":0, "anomaly":1})
     lab["label"] = lab["label"].fillna(0).astype(int)
 
-    # 3) KHỬ TRÙNG LẶP NHÃN (nhiều dòng / BlockId) → lấy max (nếu có 1 lần anomaly => 1)
+    #KHỬ TRÙNG LẶP NHÃN (nhiều dòng / BlockId) → lấy max (nếu có 1 lần anomaly => 1)
     lab = (lab.groupby("block_id", as_index=False)["label"].max())
 
-    # 4) JOIN 1–1 (LEFT) theo block_id
+    # JOIN 1–1 (LEFT) theo block_id
     out = sess.merge(lab, on="block_id", how="left")
-    # Ensure label column exists after merge
     if "label" not in out.columns:
         out["label"] = 0
     out["label"] = out["label"].fillna(0).astype(int)
 
-    # 5) sanity checks + ghi
+    # sanity checks + ghi
     before = len(out)
 
-    # Check for ACTUAL duplicates in session_id (this should be rare/zero now)
+    # Check duplicates in session_id 
     dup = out["session_id"].duplicated().sum()
     if dup > 0:
         print(f"[WARN] Có {dup} dòng trùng session_id trong output — điều này bất thường.")

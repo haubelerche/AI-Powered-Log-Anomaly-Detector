@@ -5,7 +5,6 @@ import pandas as pd
 
 MODELS_DIR = "models"
 
-# --- Load 3 model outputs ---
 iso  = pd.DataFrame({
     "session_id": np.load(os.path.join(MODELS_DIR, "iso_forest", "session_ids.npy"), allow_pickle=True),
     "score_iso":  np.load(os.path.join(MODELS_DIR, "iso_forest", "scores.npy"))
@@ -19,7 +18,7 @@ lstm = pd.DataFrame({
     "score_lstm": np.load(os.path.join(MODELS_DIR, "lstm_ae", "scores.npy"))
 })
 
-# --- Hợp nhất TẤT CẢ session_id (outer) ---
+#Hợp nhất
 df = iso.merge(ae, on="session_id", how="outer").merge(lstm, on="session_id", how="outer")
 
 # Nếu điểm càng lớn càng “bất thường”, thì percentile rank (pct=True) sẽ cho:
@@ -31,14 +30,13 @@ for c in scores:
         df[c] = np.nan
     df[f"p_{c}"] = df[c].rank(pct=True)  # tự bỏ qua NaN
 
-# Ensemble = trung bình các percentile có sẵn (skipna=True)
+#  trung bình các percentile có sẵn 
 p_cols = [f"p_{c}" for c in scores]
 df["ens_pct"] = df[p_cols].mean(axis=1, skipna=True)
 
-# Sắp xếp: lớn hơn = bất thường hơn
+# lớn hơn = bất thường hơn
 df_sorted = df.sort_values("ens_pct", ascending=False)
 
-# --- Lưu CẢ HAI ---
 out_all = os.path.join(MODELS_DIR, "ensemble_all.csv")
 out_top = os.path.join(MODELS_DIR, "ensemble_top5k.csv")
 df_sorted.to_csv(out_all, index=False)

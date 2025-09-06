@@ -1,4 +1,4 @@
-# src/train_ae.py  — Dense AE with stronger compression + dual scoring (recon + latent)
+# src/train_ae.py  
 import os, json, joblib
 from pathlib import Path
 import numpy as np
@@ -17,20 +17,19 @@ OOF  = Path("oof")
 REP  = Path("reports")
 for d in (MD, OOF, REP): d.mkdir(parents=True, exist_ok=True)
 
-# --- GPU memory growth to reduce OOM ---
 for g in tf.config.list_physical_devices('GPU'):
     try:
         tf.config.experimental.set_memory_growth(g, True)
     except Exception:
         pass
 
-# ---------- load sparse features ----------
+#load sparse features 
 Xtr = sparse.load_npz(FEAT/"X_train.npz")   # csr
 ytr = np.load(FEAT/"y_train.npy")
 Xva = sparse.load_npz(FEAT/"X_val.npz")
 yva = np.load(FEAT/"y_val.npy")
 
-# ---------- SVD compression (smaller to force reconstruction error) ----------
+# SVD compression (smaller to force reconstruction error)
 mask_b = (ytr == 0)
 idx_b  = np.flatnonzero(mask_b)
 cap    = min(120_000, idx_b.size)
@@ -38,7 +37,7 @@ if idx_b.size > cap:
     rng = np.random.default_rng(42)
     idx_b = rng.choice(idx_b, size=cap, replace=False)
 
-svd_dim  = 256     # ↓ từ 512 → 256 để tăng áp lực nén
+svd_dim  = 256     
 svd_iter = 5
 svd = TruncatedSVD(n_components=svd_dim, n_iter=svd_iter, random_state=42)
 Xtr_b_svd = svd.fit_transform(Xtr[idx_b])
@@ -46,14 +45,14 @@ Xtr_svd   = svd.transform(Xtr)
 Xva_svd   = svd.transform(Xva)
 evr_sum   = float(svd.explained_variance_ratio_.sum())
 
-# ---------- scale (zero-center) ----------
+#scale 
 sc = StandardScaler(with_mean=True, with_std=True)
 Xtr_b = sc.fit_transform(Xtr_svd[ytr==0])
 Xva_b = sc.transform(Xva_svd)
 
 in_dim = Xtr_b.shape[1]  # = svd_dim
 
-# ---------- build AE (noise + L1 sparsity + BN) ----------
+#  build AE (noise + L1 sparsity + BN) 
 def build_models(d: int, bottleneck: int = 16):
     inp = keras.Input(shape=(d,), dtype="float32")
     x = layers.GaussianNoise(0.05)(inp)              # denoising to generalize
@@ -80,7 +79,7 @@ ae, enc = build_models(in_dim, bottleneck=16)
 es  = keras.callbacks.EarlyStopping(monitor="val_loss", patience=7, restore_best_weights=True)
 rlr = keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, min_lr=1e-5, verbose=1)
 
-# ---------- train with OOM-safe batching ----------
+# train with OOM-safe batching
 trained = False
 for b in [256, 192, 128, 96, 64]:
     try:
@@ -101,7 +100,7 @@ if not trained:
            batch_size=128, callbacks=[es, rlr], verbose=2)
     batch_used = 128
 
-# ---------- scoring: output MSE + latent deviation ----------
+# scoring: output MSE + latent deviation 
 def mse(a, b): return np.mean((a - b)**2, axis=1)
 
 # output-space reconstruction error
@@ -126,10 +125,9 @@ z_out = (err_out - med) / (1.4826 * mad)  # robust z
 alpha = 0.6  # output error weight
 z_fuse = alpha * z_out + (1 - alpha) * score_lat
 
-# set threshold by benign quantile (p99.5)
+# threshold 
 thr = float(np.quantile(z_fuse[ben_mask_va], 0.995))
 
-# ---------- save artifacts ----------
 ae.save(MD/"ae_model.h5")
 joblib.dump(sc, MD/"ae_scaler.pkl")
 joblib.dump(svd, MD/"ae_svd.pkl")

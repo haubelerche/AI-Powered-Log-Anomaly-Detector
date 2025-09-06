@@ -17,11 +17,10 @@ FEAT = Path("features/iso")
 OOF  = Path("oof")
 REP  = Path("reports"); REP.mkdir(parents=True, exist_ok=True)
 
-# ------------------ Load ground truth ------------------
+
 y   = np.load(FEAT / "y_val.npy")
 sid = np.load(FEAT / "sid_val.npy", allow_pickle=True).astype(str)
 
-# ------------------ Primary channel: LGBM ONLY ------------------
 if (OOF / "iso_val_score.npy").exists():
     print("[INFO] iso_val_score.npy detected but IGNORED (Isolation Forest disabled).")
 
@@ -37,8 +36,8 @@ n = len(y)
 if len(p_primary) != n:
     raise ValueError(f"{primary_name} length {len(p_primary)} != y length {n}")
 
-# ------------------ AE channels ------------------
-# Fallback fused z_ae (giữ schema cũ)
+# ae
+
 z_ae = None
 if (OOF / "ae_val_error.npy").exists():
     z_ae = np.load(OOF / "ae_val_error.npy")
@@ -59,14 +58,14 @@ if (OOF / "ae_val_zout.npy").exists() and (OOF / "ae_val_zlat.npy").exists():
 else:
     print("[INFO] Không tìm thấy z_out/z_lat, dùng fused z_ae cho stacker.")
 
-# ------------------ Build stacker features ------------------
+# Build stacker features
 if use_three_feats:
-    Z = np.column_stack([p_primary, z_out, z_lat])  # 3 features
+    Z = np.column_stack([p_primary, z_out, z_lat])  # 3 feat
     feat_names = [f"{primary_name}_score", "z_out", "z_lat"]
 else:
     if z_ae is None:
         raise FileNotFoundError("Thiếu cả (z_out & z_lat) lẫn z_ae. Hãy chạy train_ae.py trước.")
-    Z = np.column_stack([p_primary, z_ae])          # 2 features
+    Z = np.column_stack([p_primary, z_ae])          # 2 feat
     feat_names = [f"{primary_name}_score", "z_ae"]
 
 sc  = StandardScaler()
@@ -75,7 +74,7 @@ stk = LogisticRegression(max_iter=1000)
 stk.fit(Zs, y)
 fusion = stk.predict_proba(Zs)[:, 1]
 
-# ------------------ Metrics + chọn ngưỡng theo Fβ ------------------
+#Metrics + chọn ngưỡng theo F
 roc = roc_auc_score(y, fusion)
 ap  = average_precision_score(y, fusion)
 prec, rec, th = precision_recall_curve(y, fusion)
@@ -91,7 +90,7 @@ f1 = f1_score(y, yhat)
 prevalence = float(y.mean())
 ap_gain = ap / max(prevalence, 1e-12)
 
-# ------------------ Plots ------------------
+
 plt.figure()
 RocCurveDisplay.from_predictions(y, fusion)
 plt.plot([0, 1], [0, 1], '--')
@@ -106,7 +105,7 @@ sns.heatmap(cm, annot=True, fmt="d", cbar=False)
 plt.xlabel("Predicted"); plt.ylabel("True"); plt.title("Confusion Matrix @ best Fβ=1.5")
 plt.tight_layout(); plt.savefig(REP / "cm.png", dpi=150); plt.close()
 
-# ------------------ Write metrics ------------------
+# luu metrics 
 with open(REP / "metrics.json", "w") as f:
     json.dump({
         "STACKER_ON": "lgbm+ae(z_out,z_lat)" if use_three_feats else "lgbm+ae(fused)",
@@ -123,7 +122,7 @@ with open(REP / "metrics.json", "w") as f:
 print(f"[STACK] on LGBM | feats={feat_names} | ROC={roc:.4f} AP={ap:.4f} "
       f"(x{ap_gain:.1f} over baseline {prevalence:.4%}) | F1@thr={f1:.4f} thr={thr:.4f}")
 
-# ------------------ CSV cho Grafana ------------------
+#  CSV cho Grafana 
 sess = pd.read_csv("data/processed/sessions.csv", usecols=["session_id", "timestamp"])
 df_val = pd.DataFrame({"session_id": sid})
 df_val = df_val.merge(sess, on="session_id", how="left")
@@ -150,7 +149,7 @@ if use_three_feats:
 
 out.to_csv("ensemble_sessions.csv", index=False)
 
-# ------------------ Save fusion OOF + stacker for serving ------------------
+# save fusion OOF + stacker for serving 
 np.save(OOF / "fusion_val_score.npy", fusion)
 
 ENS = Path("models/ensemble"); ENS.mkdir(parents=True, exist_ok=True)
@@ -159,7 +158,7 @@ joblib.dump(
         "scaler": sc,
         "stacker": stk,
         "thr": float(thr),
-        "feat_names": feat_names,     # ['lgbm_score','z_out','z_lat'] or ['lgbm_score','z_ae']
+        "feat_names": feat_names,     
         "primary": "lgbm"
     },
     ENS / "stacker.joblib"

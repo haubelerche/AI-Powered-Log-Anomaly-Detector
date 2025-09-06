@@ -13,7 +13,6 @@ FEAT.mkdir(parents=True, exist_ok=True)
 def norm_id(s: pd.Series) -> pd.Series:
     return s.astype(str).str.strip().str.lower()
 
-# 1) Load sessions & events (ưu tiên lines_csv)
 sess = pd.read_csv(INP / "sessions.csv", parse_dates=["timestamp"], low_memory=False)
 sess.columns = [c.strip().lower() for c in sess.columns]
 sess["session_id"] = norm_id(sess["session_id"])
@@ -37,14 +36,14 @@ if "session_id" not in evs.columns:
         raise ValueError("events thiếu session_id/block_id để group.")
 evs["session_id"] = norm_id(evs["session_id"])
 
-# 2) Cột text cho TF-IDF (ưu tiên template/log_key; fallback service)
+#Cột text cho TF-IDF (ưu tiên template/log_key; fallback service)
 cands = ['log_key', 'template_id', 'event_template', 'message', 'log_message', 'service']
 doc_col = next((c for c in cands if c in evs.columns), None)
 if doc_col is None:
     raise ValueError(f"Không tìm thấy cột text cho TF-IDF. Tìm trong: {cands}. Hiện có: {list(evs.columns)}")
 print(f"[features] using '{doc_col}' for text")
 
-# 3) Giữ thứ tự event trong session
+# Giữ thứ tự event trong session
 if "pos" in evs.columns:
     evs = evs.sort_values(["session_id", "pos"])
 elif "timestamp" in evs.columns:
@@ -53,13 +52,13 @@ elif "timestamp" in evs.columns:
 else:
     evs = evs.sort_values(["session_id"])
 
-# 4) Tạo doc per session
+# Tạo doc per session
 text_series = evs[doc_col].astype(str).str.strip()
 doc_df = (evs[["session_id"]].assign(tok=text_series)
           .groupby("session_id", sort=False)["tok"]
           .apply(lambda s: " ".join(s.values)).rename("doc").reset_index())
 
-# 5) n_events chính xác từ events
+# n_events chính xác từ events
 nevents = (evs.groupby("session_id", sort=False).size()
            .rename("n_events").reset_index())
 
@@ -80,7 +79,7 @@ for col in ("n_events_x", "n_events_y"):
 
 df["doc"] = df["doc"].fillna("")
 
-# 6) duration_sec: ưu tiên từ sessions; nếu thiếu, tính từ events nếu có timestamp
+#duration_sec: ưu tiên từ sessions; nếu thiếu, tính từ events nếu có timestamp
 if {"timestamp_start","timestamp_end"} <= set(sess.columns):
     df["duration_sec"] = (
         pd.to_datetime(df["timestamp_end"]) - pd.to_datetime(df["timestamp_start"])
@@ -95,7 +94,7 @@ else:
     df["duration_sec"] = 0.0
 
 
-# 7) Time-based split: giữ thời gian nhưng đảm bảo ~20% positives ở VAL
+# giữ thời gian nhưng đảm bảo ~20 % positives ở VAL
 df = df.sort_values("timestamp").reset_index(drop=True)
 
 pos_mask = (df["label"] == 1)
@@ -107,7 +106,6 @@ if n_pos > 0:
     if pd.isna(t_cut):
         t_cut = df["timestamp"].quantile(0.80)
 else:
-    # không có positive (không xảy ra ở bạn), fallback
     t_cut = df["timestamp"].quantile(0.80)
 
 tr = df[df["timestamp"] < t_cut].copy()
@@ -123,7 +121,7 @@ print(f"[split] train={len(tr)} (pos={int(tr['label'].sum())}) | "
       f"val={len(va)} (pos={int(va['label'].sum())}) | t_cut={t_cut}")
 
 
-# 8) TF-IDF (float32 để tiết kiệm RAM)
+# TF-IDF 
 vec = TfidfVectorizer(
     ngram_range=(1, 2),
     min_df=2,
@@ -141,7 +139,7 @@ def numf(d: pd.DataFrame) -> np.ndarray:
 Xtr = sparse.hstack([Xtr_txt, sparse.csr_matrix(numf(tr))], format="csr")
 Xva = sparse.hstack([Xva_txt, sparse.csr_matrix(numf(va))], format="csr")
 
-# 9) Save
+
 np.save(FEAT / "y_train.npy", tr["label"].astype(int).to_numpy())
 np.save(FEAT / "y_val.npy",   va["label"].astype(int).to_numpy())
 np.save(FEAT / "sid_train.npy", tr["session_id"].to_numpy())
@@ -149,7 +147,6 @@ np.save(FEAT / "sid_val.npy",   va["session_id"].to_numpy())
 sparse.save_npz(FEAT / "X_train.npz", Xtr)
 sparse.save_npz(FEAT / "X_val.npz",   Xva)
 
-# Lưu tham số vectorizer (fix JSON cho dtype/regex)
 params = vec.get_params()
 params["dtype"] = str(params.get("dtype", ""))
 if "token_pattern" in params and hasattr(params["token_pattern"], "pattern"):
